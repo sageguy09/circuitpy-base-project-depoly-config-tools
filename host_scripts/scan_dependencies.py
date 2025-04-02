@@ -210,6 +210,146 @@ def update_requirements_file(req_file, missing_requirements):
         print(f"Error updating requirements file: {e}")
         return False
 
+def get_common_adafruit_modules():
+    """Get a list of common Adafruit CircuitPython modules"""
+    common_modules = [
+        # Display modules
+        'adafruit_display_text',
+        'adafruit_display_shapes',
+        'adafruit_bitmap_font',
+        'adafruit_imageload',
+        'adafruit_button',
+        
+        # Hardware interfaces
+        'adafruit_esp32spi',
+        'adafruit_bus_device',
+        'adafruit_register',
+        'adafruit_requests',
+        'adafruit_connection_manager',
+        
+        # Sensors
+        'adafruit_bme280',
+        'adafruit_dht',
+        'adafruit_lis3dh',
+        'adafruit_lsm6ds',
+        'adafruit_bno055',
+        'adafruit_hcsr04',
+        
+        # Displays
+        'adafruit_ili9341',
+        'adafruit_st7735r',
+        'adafruit_st7789',
+        'adafruit_pcd8544',
+        'adafruit_rgb_display',
+        
+        # Special devices
+        'adafruit_pyportal',
+        'adafruit_matrixportal',
+        'adafruit_portalbase',
+        'adafruit_magtag',
+        'adafruit_funhouse',
+        'adafruit_clue',
+        
+        # Input
+        'adafruit_touchscreen',
+        'adafruit_neokey',
+        'adafruit_neotrellis',
+        
+        # Networking and connectivity
+        'adafruit_io',
+        'adafruit_minimqtt',
+        'adafruit_wiznet5k',
+        'adafruit_esp32spi_wifimanager',
+        
+        # Other common libraries
+        'adafruit_simpleio',
+        'adafruit_thermal_printer',
+        'adafruit_motor',
+        'adafruit_led_animation',
+        'adafruit_typing',
+        'adafruit_neopixel',
+        'adafruit_framebuf',
+        'adafruit_pixel_framebuf',
+    ]
+    
+    return common_modules
+
+def select_additional_libraries(detected_modules, existing_requirements):
+    """Interactive mode to select additional libraries to include"""
+    print("\n=== Interactive Library Selection ===")
+    print("Select additional libraries to include in requirements.txt")
+    
+    # Get common libraries that aren't already detected
+    common_libraries = get_common_adafruit_modules()
+    candidates = []
+    
+    # First add libraries from existing requirements that aren't detected
+    for lib in sorted(existing_requirements):
+        if lib not in detected_modules:
+            candidates.append((lib, True, "From existing requirements.txt"))
+    
+    # Then add common libraries that aren't detected or in requirements
+    for lib in sorted(common_libraries):
+        if lib not in detected_modules and lib not in existing_requirements:
+            candidates.append((lib, False, "Common CircuitPython library"))
+    
+    # Allow custom entry
+    print("\nCurrent libraries:")
+    for lib in sorted(detected_modules):
+        print(f"  ✓ {lib} (auto-detected)")
+    
+    print("\nAdditional libraries:")
+    if not candidates:
+        print("  No additional libraries found")
+        return []
+    
+    # Display candidates with numbers
+    for i, (lib, is_selected, source) in enumerate(candidates):
+        status = "✓" if is_selected else " "
+        print(f"  [{i+1}] [{status}] {lib} ({source})")
+    
+    # Prompt for selection
+    print("\nEnter numbers to toggle selection (comma-separated), 'a' to select all,")
+    print("'n' to select none, 'c' to add a custom library, or 'q' to finish:")
+    
+    selected = [lib for lib, is_selected, _ in candidates if is_selected]
+    
+    while True:
+        choice = input("> ").strip().lower()
+        
+        if choice == 'q':
+            break
+        elif choice == 'a':
+            selected = [lib for lib, _, _ in candidates]
+            print("Selected all libraries")
+        elif choice == 'n':
+            selected = []
+            print("Deselected all libraries")
+        elif choice == 'c':
+            custom = input("Enter custom library name: ").strip()
+            if custom and custom not in detected_modules and custom not in selected:
+                selected.append(custom)
+                print(f"Added {custom}")
+        else:
+            try:
+                # Parse comma-separated list of numbers
+                indices = [int(idx.strip()) - 1 for idx in choice.split(',')]
+                for idx in indices:
+                    if 0 <= idx < len(candidates):
+                        lib = candidates[idx][0]
+                        if lib in selected:
+                            selected.remove(lib)
+                            print(f"Deselected {lib}")
+                        else:
+                            selected.append(lib)
+                            print(f"Selected {lib}")
+                    else:
+                        print(f"Invalid selection: {idx+1}")
+            except ValueError:
+                print("Invalid input. Enter numbers, 'a', 'n', 'c', or 'q'")
+    
+    return selected
+
 def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='CircuitPython PyPortal Dependency Scanner')
@@ -221,6 +361,8 @@ def main():
                         help='Minimal output (works well with --clean)')
     parser.add_argument('-d', '--deep', action='store_true',
                         help='Perform deeper analysis for hard-to-detect dependencies')
+    parser.add_argument('-i', '--interactive', action='store_true',
+                        help='Interactive mode to select additional libraries')
     args = parser.parse_args()
 
     # Find project root directory
@@ -299,6 +441,16 @@ def main():
             if dep not in existing_requirements:
                 missing_requirements.add(dep)
     
+    # Interactive mode to select additional libraries
+    additional_libraries = []
+    if args.interactive and not args.clean and not args.quiet:
+        additional_libraries = select_additional_libraries(adafruit_modules, existing_requirements)
+        if additional_libraries:
+            print(f"\nAdding {len(additional_libraries)} manually selected libraries:")
+            for lib in sorted(additional_libraries):
+                print(f"  + {lib}")
+            missing_requirements.update(additional_libraries)
+    
     # Show results
     if args.clean:
         # Clean output - just the requirements
@@ -312,7 +464,10 @@ def main():
         if missing_requirements:
             print("\nMissing from requirements.txt:")
             for req in sorted(missing_requirements):
-                print(f"  - {req}")
+                if req in additional_libraries:
+                    print(f"  - {req} (manually selected)")
+                else:
+                    print(f"  - {req}")
             
             print("\nConsider adding these to requirements.txt:")
             print("----------------------------------------")
@@ -322,7 +477,7 @@ def main():
             print("\nAll detected dependencies are already in requirements.txt")
         
         # Verify existing requirements are actually used
-        unused_requirements = existing_requirements - adafruit_modules
+        unused_requirements = existing_requirements - adafruit_modules - set(additional_libraries)
         if unused_requirements:
             print("\nPossibly unused requirements (but keep them if needed):")
             for req in sorted(unused_requirements):
