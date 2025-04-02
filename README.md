@@ -145,16 +145,36 @@ python3 host_scripts/circup_installer.py --monitor
 
 #### Method 3: REPL-Triggered Installation
 
-1. Copy `install_req.py` to your CircuitPython device
+There are two ways to trigger installation from the REPL:
+
+##### Option A: Using install_req.py
+1. Make sure install_req.py is on your CircuitPython device (deploy.py copies it)
 2. Connect to your device's REPL
 3. In the REPL, import the module:
    ```python
    import install_req
    ```
-4. On your computer (not in the REPL), run:
+   This will immediately trigger the installation request.
+
+4. On your computer (not in the REPL), run one of:
    ```bash
+   # For systems with pip-installed pyserial:
    python3 host_scripts/circup_installer.py --monitor
+   
+   # For systems requiring pipx:
+   python3 host_scripts/pipx_serial_monitor.py
    ```
+
+##### Option B: Using repl_installer.py
+1. Make sure repl_installer.py is on your CircuitPython device
+2. Connect to your device's REPL
+3. In the REPL, import and run:
+   ```python
+   import repl_installer
+   repl_installer.install()
+   ```
+
+4. Follow step 4 from Option A above
 
 #### Method 4: Using circup Directly
 
@@ -206,6 +226,17 @@ pipx ensurepath
 ### REPL Connection Issues
 
 Only one program can connect to the serial port at a time. If you're running the installer, make sure no other program (like Mu Editor or screen) is connected to the REPL.
+
+### PySerial Installation on Silicon Macs
+
+If you're using a Silicon Mac (M1/M2/M3) and can't use direct pip installation:
+
+1. Use the pipx-compatible serial monitor script:
+   ```bash
+   python3 host_scripts/pipx_serial_monitor.py
+   ```
+
+2. This script works with pipx-installed pyserial and doesn't require pip installation
 
 ## Accessing the REPL
 

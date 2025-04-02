@@ -60,7 +60,7 @@ try:
     import adafruit_connection_manager
     pool = adafruit_connection_manager.get_radio_socketpool(esp)
     ssl_context = adafruit_connection_manager.get_radio_ssl_context(esp)
-    requests = adafruit_requests.Session(pool, ssl_context)
+    requests = requests.Session(pool, ssl_context)  # FIXED: Using "requests" instead of "adafruit_requests"
     print("Using modern connection manager")
 except ImportError:
     # Fall back to legacy approach if connection manager is not available

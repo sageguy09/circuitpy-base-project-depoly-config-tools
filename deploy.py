@@ -16,6 +16,7 @@ REQUIRED_FILES = [
 ]
 HELPER_FILES = [
     "install_req.py",
+    "repl_installer.py",  # Added repl_installer.py to helper files
 ]
 REQUIRED_LIBS = [
     "adafruit_pyportal",
